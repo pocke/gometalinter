@@ -300,9 +300,6 @@ func (v Vars) Replace(s string) string {
 }
 
 func main() {
-	// Linters are by their very nature, short lived, so disable GC.
-	// Reduced (user) linting time on kingpin from 0.97s to 0.64s.
-	_ = os.Setenv("GOGC", "off")
 	kingpin.CommandLine.Help = fmt.Sprintf(`Aggregate and normalise the output of a whole bunch of Go linters.
 
 Default linters:
@@ -645,6 +642,11 @@ func executeLinter(state *linterState) error {
 	}
 	cmd.Stdout = buf
 	cmd.Stderr = buf
+	// Linters are by their very nature, short lived, so disable GC.
+	// Reduced (user) linting time on kingpin from 0.97s to 0.64s.
+	if !isSlowLinter(state.Name) {
+		cmd.Env = append(os.Environ(), "GOGC=off")
+	}
 	err = cmd.Start()
 	if err != nil {
 		return fmt.Errorf("failed to execute linter %s: %s", command, err)
@@ -789,4 +791,13 @@ func fixupPath() {
 	path := strings.Join(paths, string(os.PathListSeparator))
 	os.Setenv("PATH", path)
 	debug("PATH=%s", os.Getenv("PATH"))
+}
+
+func isSlowLinter(name string) bool {
+	for _, x := range slowLinters {
+		if x == name {
+			return true
+		}
+	}
+	return false
 }
